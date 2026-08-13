@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>DNS 设置状态检查</title>
+</head>
+<body>
+    <h2>DNS 设置状态检查 (getNoticeMsgV2)</h2>
+    <button id="checkBtn">检查 DNS 设置</button>
+    <pre id="result" style="background:#f4f4f4;padding:12px;border-radius:6px;min-height:80px;white-space:pre-wrap;word-break:break-all;"></pre>
+
+    <script nonce="Mzk4NDQ2NzI5OCwzMTgwMjM0OTQx">
+        (function() {
+            const resultEl = document.getElementById('result');
+
+            // 显示消息到页面
+            function showMessage(msg, isError = false) {
+                const prefix = isError ? '❌ ' : '✅ ';
+                resultEl.textContent = prefix + msg;
+            }
+
+            // 显示完整 JSON (用于调试/信息)
+            function showFullJson(data) {
+                try {
+                    resultEl.textContent = '📦 完整返回 (已格式化):\n' + JSON.stringify(data, null, 2);
+                } catch (e) {
+                    resultEl.textContent = '⚠️ 无法序列化 JSON: ' + String(e);
+                }
+            }
+
+            // 核心检查逻辑
+            function checkDnsSetting() {
+                // 重置显示
+                resultEl.textContent = '⏳ 请求中...';
+
+                const url = 'https://iot-admin.zuoyebang.com/iot-study/common/getNoticeMsgV2';
+
+                // 创建 XHR 对象
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', url, true);
+
+                // 设置请求头 (根据常见POST JSON 习惯, 但此处没有 body, 保留标准头)
+                xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8');
+                // 可添加其他头, 但非必须
+
+                // 超时处理
+                xhr.timeout = 15000; // 15秒
+
+                xhr.onload = function() {
+                    // 状态码 2xx 视为成功
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            // 解析返回内容为 JSON
+                            const responseData = JSON.parse(xhr.responseText);
+
+                            // 显示完整 JSON (便于观察)
+                            showFullJson(responseData);
+
+                            // 检查是否存在 cfknb 项 (不区分大小写? 按题目要求精确匹配 "cfknb")
+                            // 但有的接口可能返回数字或字符串, 我们检查 key 是否存在
+                            if (responseData.hasOwnProperty('cfknb')) {
+                                // 存在 cfknb 项 -> 显示 DNS 设置成功
+                                // 但为了友好, 在完整json下方追加一行成功提示 (保留完整json)
+                                const currentText = resultEl.textContent;
+                                resultEl.textContent = currentText + '\n\n🎉 检测到 cfknb 字段 → DNS 设置成功！';
+                            } else {
+                                // 不存在 cfknb
+                                const currentText = resultEl.textContent;
+                                resultEl.textContent = currentText + '\n\n⚠️ 未检测到 cfknb 字段 → DNS 设置未生效或接口无此字段。';
+                            }
+                        } catch (parseError) {
+                            // JSON 解析失败
+                            showMessage('返回内容不是有效 JSON: ' + parseError.message + '\n原始内容: ' + xhr.responseText, true);
+                        }
+                    } else {
+                        // HTTP 错误状态
+                        showMessage('请求失败, HTTP状态: ' + xhr.status + ' ' + xhr.statusText, true);
+                    }
+                };
+
+                xhr.onerror = function() {
+                    // 网络错误
+                    showMessage('网络错误, 无法连接到服务器 (CORS 或网络问题)', true);
+                };
+
+                xhr.ontimeout = function() {
+                    showMessage('请求超时 (15秒)', true);
+                };
+
+                // 发送请求 (POST body 为空, 根据接口惯例)
+                xhr.send("{}");
+            }
+
+            // 绑定按钮事件
+            document.getElementById('checkBtn').addEventListener('click', checkDnsSetting);
+
+            // 页面加载完成后可自动执行一次 (可选)
+            // 但为了用户手动触发, 不自动执行, 让用户点击
+            // 如果希望自动检查, 取消注释下面一行:
+            window.addEventListener('load', checkDnsSetting);
+        })();
+    </script>
+
+    <p style="margin-top:20px;font-size:0.9rem;color:#555;">
+        👆 点击按钮, 通过 XHR POST 请求 <code>https://iot-admin.zuoyebang.com/iot-study/common/getNoticeMsgV2</code><br>
+        返回 JSON 中若存在 <code>cfknb</code> 字段, 则显示“DNS设置成功”, 否则提示未检测到。
+    </p>
+    <p style="font-size:0.8rem;color:#999;">
+        * 注意: 此请求可能因跨域(CORS)策略被浏览器拦截, 若失败请检查控制台错误。
+    </p>
+</body>
+</html>
